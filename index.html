@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CAPTCHAWAR - System Override</title>
+    <link href="https://fonts.googleapis.com/css2?family=Gugi&family=VT323&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        /* --- CSS VARIABLES & RESET --- */
+        :root {
+            --color-red: #ff0000;
+            --color-blue: #5c98ff;
+            --color-green: #86e105;
+            --color-white: #ffffff;
+            --font-main: 'Gugi', cursive;
+            --font-mono: 'VT323', monospace;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #ffffff;
+            font-family: var(--font-main);
+            user-select: none;
+        }
+
+        /* --- LAYERS --- */
+        #root { position: relative; width: 100vw; height: 100vh; }
+        
+        .scanlines {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,0), rgba(0,0,0,0) 1px, rgba(0,0,0,0.1) 1px, rgba(0,0,0,0.1) 2px);
+            pointer-events: none;
+            z-index: 9999;
+        }
+
+        #ascii-canvas {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 0; opacity: 0.15; pointer-events: none;
+        }
+
+        #crash-bg {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            z-index: 1; opacity: 0.4; pointer-events: none;
+            background-size: cover; background-position: center; background-repeat: no-repeat;
+            filter: contrast(1.2) brightness(0.8);
+            display: none;
+            background-color: #000; /* Fallback */
+        }
+
+        /* --- LOGO STYLES (NEW) --- */
+        #site-logo {
+            position: fixed;
+            /* The terminal box width is 400px, maintain consistency here */
+            width: 90%;
+            max-width: 400px;
+            top: calc(50% - 240px); /* 手机上可能需要向上微调 */
+            /* Centering logic */
+            left: 50%;
+            transform: translateX(-50%);
+            /* Vertical position: placed slightly above the center of the screen, just above the terminal box */
+            top: calc(50% - 280px); 
+            z-index: 200;
+            cursor: pointer;
+            display: block;
+        }
+
+        #site-logo:hover {
+            animation: glitch-anim 0.3s infinite;
+        }
+
+        @keyframes glitch-anim {
+            0% { transform: translateX(-50%) translate(0, 0); opacity: 1; }
+            25% { transform: translateX(-50%) translate(0.5px, 0.5px); opacity: 0.95; }
+            50% { transform: translateX(-50%) translate(-0.5px, -0.5px); opacity: 1; }
+            75% { transform: translateX(-50%) translate(-0.5px, 0.5px); opacity: 0.95; }
+            100% { transform: translateX(-50%) translate(0, 0); opacity: 1; }
+        }
+
+        /* --- SURVEILLANCE UI --- */
+        .surveillance-ui {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 9000;
+            font-family: var(--font-mono); color: var(--color-red);
+            text-shadow: 0 0 2px var(--color-red);
+        }
+        .coords { position: absolute; bottom: 20px; right: 20px; font-size: 1.5rem; }
+        .probability { position: absolute; top: 20px; right: 20px; font-size: 1.5rem; text-align: right; }
+        .crosshair { position: absolute; width: 100%; height: 1px; background: rgba(255, 0, 0, 0.2); top: 50%; }
+        .crosshair.v { width: 1px; height: 100%; background: rgba(255, 0, 0, 0.2); left: 50%; top: 0; }
+
+        /* --- TERMINAL (INTRO) --- */
+        .terminal-container {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 400px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.9);
+            padding: 2rem;
+            border: 2px solid var(--color-green);
+            box-shadow: 0 0 20px var(--color-green);
+            font-family: var(--font-mono); color: var(--color-green);
+            display: none; /* Toggled by JS */
+        }
+        .terminal-container.active { display: block; }
+
+        .terminal-header { margin-bottom: 20px; text-transform: uppercase; border-bottom: 1px dashed var(--color-green); padding-bottom: 10px; }
+        .terminal-input-group { display: flex; gap: 10px; align-items: center; }
+        .terminal-prompt { color: var(--color-green); font-size: 1.2rem; }
+        .terminal-input {
+            background: transparent; border: none; border-bottom: 2px solid var(--color-green);
+            color: var(--color-white); font-family: var(--font-mono); font-size: 1.5rem;
+            width: 100%; outline: none; text-transform: uppercase;
+        }
+        .terminal-error {
+            color: var(--color-red); margin-top: 10px; font-size: 1.2rem; text-transform: uppercase;
+            animation: blink 0.5s step-end infinite alternate; display: none;
+        }
+        .cursor { display: inline-block; width: 10px; height: 1.2em; background: var(--color-green); animation: blink 1s step-end infinite; }
+        .terminal-btn {
+            margin-top: 25px; background: transparent; border: 2px solid var(--color-green);
+            color: var(--color-green); padding: 10px 20px; font-family: var(--font-mono);
+            font-size: 1.5rem; cursor: pointer; text-transform: uppercase; font-weight: bold; width: 100%;
+            transition: all 0.1s;
+        }
+        .terminal-btn:hover { background: var(--color-green); color: #000; box-shadow: 0 0 15px var(--color-green); }
+        .terminal-btn:active { transform: scale(0.98); }
+
+        /* --- VERIFIED SCREEN --- */
+        .verified-container {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 400px; z-index: 100; background: rgba(0, 0, 0, 0.9); padding: 2rem;
+            border: 2px solid var(--color-green); box-shadow: 0 0 20px var(--color-green);
+            font-family: var(--font-mono); color: var(--color-green); text-align: center;
+            display: none;
+        }
+        .verified-container.active { display: block; }
+        .verified-text-box { margin: 20px 0; font-size: 1.2rem; }
+
+        /* --- MAC WINDOWS --- */
+        .mac-window {
+            position: absolute; background: #ececec; border: 1px solid #aaa;
+            border-radius: 6px; box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+            display: flex; flex-direction: column; overflow: hidden;
+            width: 300px; height: 200px; /* Defaults */
+        }
+        .mac-titlebar {
+            height: 24px; background: linear-gradient(to bottom, #e0e0e0, #c0c0c0);
+            border-bottom: 1px solid #aaa; display: flex; align-items: center; padding: 0 8px; cursor: grab;
+        }
+        .mac-titlebar:active { cursor: grabbing; }
+        .mac-buttons { display: flex; gap: 6px; margin-right: 12px; }
+        .mac-btn { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.2); }
+        .mac-btn.close { background: #ff5f56; cursor: pointer; }
+        .mac-btn.close:hover { background: #ff3b30; }
+        .mac-btn.min { background: #ffbd2e; }
+        .mac-btn.max { background: #27c93f; }
+        .mac-title { font-family: 'Inter', sans-serif; font-size: 12px; color: #333; flex: 1; text-align: center; margin-right: 50px; pointer-events: none;}
+        
+        .mac-content { flex: 1; overflow: hidden; position: relative; background: #fff; display: flex; }
+
+        /* Window Content Styles */
+        .content-text { padding: 20px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 1.2rem; font-weight: bold; color: red; background: #000; width: 100%; height: 100%; }
+        .content-code { background: #111; color: var(--color-green); padding: 10px; font-size: 0.8rem; font-family: var(--font-mono); width: 100%; height: 100%; margin: 0; overflow: hidden;}
+        .content-captcha { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; background: #fff; padding: 2px; width: 100%; height: 100%; }
+        .captcha-cell {
+            background: rgba(221, 221, 221, 0.7); display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; position: relative; cursor: pointer; overflow: hidden;
+        }
+        .captcha-cell.selected::after { content: '✓'; position: absolute; color: var(--color-green); font-size: 3rem; text-shadow: 0 0 5px black; }
+        .content-image-wrapper { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; background-size: cover; background-position: center; }
+
+        /* --- CRASH RESTART BTN --- */
+        #crash-restart-btn {
+            position: fixed; top: 20px; right: 20px; z-index: 10001;
+            background: #000; border: 2px solid var(--color-red); color: var(--color-red);
+            font-family: var(--font-mono); font-size: 1.2rem; padding: 10px 15px;
+            cursor: pointer; text-transform: uppercase; box-shadow: 0 0 10px var(--color-red);
+            display: none;
+        }
+        #crash-restart-btn:hover { background: var(--color-red); color: #000; box-shadow: 0 0 20px var(--color-red); }
+
+        /* --- QUOTE --- */
+        .edu-quote {
+            position: fixed; bottom: 0; left: 0; width: 100%; background: black;
+            color: white; padding: 10px; text-align: center; font-family: var(--font-mono);
+            z-index: 10000; font-size: 1.2rem; border-top: 1px solid var(--color-red);
+            display: none;
+        }
+
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+
+    <!-- Ambient Layers -->
+    <div class="scanlines"></div>
+    <div id="crash-bg"></div>
+    <canvas id="ascii-canvas"></canvas>
+
+    <!-- TASK 1: LOGO MOVED OUTSIDE -->
+    <img src="logo.png" id="site-logo" alt="CAPTCHA WAR">
+
+    <!-- Surveillance UI -->
+    <div class="surveillance-ui">
+        <div class="coords" id="coords">X: 0 <br> Y: 0</div>
+        <div class="probability" id="probability">HUMAN PROBABILITY: <br> 0%</div>
+        <div class="crosshair"></div>
+        <div class="crosshair v"></div>
+    </div>
+
+    <!-- Interface: Intro -->
+    <div id="intro-screen" class="terminal-container active">
+        <!-- Logo removed from here -->
+        <div class="terminal-header">Identity Verification Protocol v2.0</div>
+        <div class="terminal-prompt">ENTER SEED CODE:</div>
+        <div class="terminal-input-group">
+            <span>></span>
+            <input type="text" id="code-input" class="terminal-input" maxlength="10" autofocus autocomplete="off">
+            <div class="cursor"></div>
+        </div>
+        <div id="error-msg" class="terminal-error"></div>
+        <button id="verify-btn" class="terminal-btn">EXECUTE</button>
+        <div style="margin-top: 20px; font-size: 0.8rem; color: #666;">
+            HINT: TRY 'A1B1' or 'HUMAN'
+        </div>
+    </div>
+
+    <!-- Interface: Verified -->
+    <div id="verified-screen" class="verified-container">
+        <div class="terminal-header">Identity Confirmed</div>
+        <div class="verified-text-box">
+            <div style="font-size: 1.2rem; margin-bottom: 10px;">Congratulations🎉</div>
+            <div style="font-size: 1.2rem;">Verification successful, you are human</div>
+        </div>
+        <button id="back-btn" class="terminal-btn">Back</button>
+    </div>
+
+    <!-- Interface: Crash Elements -->
+    <button id="crash-restart-btn">[ EMERGENCY REBOOT ]</button>
+    <div id="windows-container"></div>
+    <div id="quote" class="edu-quote">
+        "The conflict arises when we attempt to force the messy, analog reality of human perception into the binary 1s and 0s of machine logic." — George Hein (Digital Theory)
+    </div>
+
+    <script>
+        // --- 1. AUDIO ASSETS CONFIGURATION (GLOBAL) ---
+        const bgDrone = new Audio('drone.mp3');
+        bgDrone.loop = true;
+        bgDrone.volume = 0.4;
+
+        const genericErrors = ['error_1.mp3', 'error_2.mp3', 'error_3.mp3'];
+        const successSound = new Audio('success.mp3');
+
+        // --- CONSTANTS & MAPS ---
+        const MAX_WINDOWS = 40;
+        const SUCCESS_CODES = ['A1B1', 'A2B2', 'A3B3', 'A4B4', 'A5B3', 'A6B1', 'A6B2', 'A6B3'];
+        const ASCII_CHARS = ['+', '-', '=', ':', '.', '*', '#', '@', '%'];
+        
+        const TASK_MAP = {
+            'A1': "Seleziona tutti gli organismi viventi :",
+            'A2': "Seleziona tutti gli oggetti che possono essere utilizzati per la navigazione :",
+            'A3': "Seleziona tutti gli oggetti che svolgono funzioni di pubblica sicurezza :",
+            'A4': "Seleziona gli oggetti che assomigliano a volti umani :",
+            'A5': "Seleziona tutti gli oggetti contenenti elementi rossi :",
+            'A6': "Seleziona oggetti appartenenti al mondo reale:"
+        };
+
+        const VISUAL_MAP = {
+            'B1': { img: 'B1.jpg', emojis: ['🐶', '🧁', '🍪', '🐩'], sound: 'bark.mp3' },
+            'B2': { img: 'B2.jpg', emojis: ['🚦', '🛑', '🚲', '🛣️'], sound: 'honk.mp3' },
+            'B3': { img: 'B3.jpg', emojis: ['🧯', '🚒', '🔥', '💦'], sound: 'siren.mp3' },
+            'B4': { img: 'B4.jpg', emojis: ['👁️', '👄', '🤡', '👺'], sound: 'glitch_voice.mp3' }
+        };
+
+        // --- STATE ---
+        let currentMode = 'intro'; // intro | verified | crash
+        let windows = []; // Stores window objects
+        let zCounter = 100;
+        let crashLoopID = null; // GLOBAL VARIABLE for interval
+        let crashTask = '';
+        let crashVisual = '';
+
+        // --- DOM ELEMENTS ---
+        const introScreen = document.getElementById('intro-screen');
+        const verifiedScreen = document.getElementById('verified-screen');
+        const crashRestartBtn = document.getElementById('crash-restart-btn');
+        const quoteBox = document.getElementById('quote');
+        const windowsContainer = document.getElementById('windows-container');
+        const crashBg = document.getElementById('crash-bg');
+        const codeInput = document.getElementById('code-input');
+        const errorMsg = document.getElementById('error-msg');
+        const verifyBtn = document.getElementById('verify-btn');
+        const backBtn = document.getElementById('back-btn');
+
+        // --- UTILS ---
+        function generateId() { return Math.random().toString(36).substring(2, 9); }
+        function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+        function randomItem(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+        // Helper to safely play sounds
+        function playSoundSafe(src) {
+            if (!src) return;
+            const audio = new Audio(src);
+            audio.play().catch(e => console.warn('Audio blocked or missing:', src));
+        }
+
+        // --- ASCII BACKGROUND ---
+        const canvas = document.getElementById('ascii-canvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        
+        function initCanvas() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        }
+        initCanvas();
+        window.addEventListener('resize', initCanvas);
+
+        const cols = Math.floor(width / 20);
+        const ypos = Array(cols).fill(0); 
+
+        function drawAscii() {
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+            ctx.fillRect(0, 0, width, height);
+            ctx.fillStyle = '#000';
+            ctx.font = '15px monospace';
+
+            ypos.forEach((y, ind) => {
+                const text = randomItem(ASCII_CHARS);
+                const x = ind * 20;
+                ctx.fillText(text, x, y);
+                if (y > 100 + Math.random() * 10000) ypos[ind] = 0;
+                else ypos[ind] = y + 20;
+            });
+        }
+        setInterval(drawAscii, 50);
+
+        // --- SURVEILLANCE LOOP ---
+        document.addEventListener('mousemove', (e) => {
+            document.getElementById('coords').innerHTML = `X: ${e.clientX} <br> Y: ${e.clientY}`;
+        });
+        setInterval(() => {
+            document.getElementById('probability').innerHTML = `HUMAN PROBABILITY: <br> ${Math.floor(Math.random() * 100)}%`;
+        }, 200);
+
+        // --- MAIN LOGIC ---
+        
+        // TASK 2: REWRITE RESET SYSTEM / REBOOT LOGIC (ROBUST FIX)
+        function resetSystem() {
+            // 1. Stop the loop generator (highest priority)
+            if (crashLoopID) {
+                clearInterval(crashLoopID);
+                crashLoopID = null;
+            }
+
+            // 2. Nuclear-level mute logic (Nuclear Audio Stop)
+            if (bgDrone) {
+                bgDrone.volume = 0; // Force mute first
+                bgDrone.pause();
+                bgDrone.currentTime = 0;
+                
+                // Pause again after a slight delay to ensure everything is done correctly
+                setTimeout(() => {
+                    bgDrone.pause();
+                    bgDrone.currentTime = 0;
+                    console.log("Audio has been forced to stop");
+                }, 100);
+            }
+
+            // 3. Clean up DOM and State
+            const container = document.getElementById('windows-container');
+            if (container) container.innerHTML = '';
+            windows = [];
+
+            // 4. Reset UI Elements
+            const codeInput = document.getElementById('code-input');
+            const errorMsg = document.getElementById('error-msg');
+            if (codeInput) codeInput.value = '';
+            if (errorMsg) errorMsg.style.display = 'none';
+
+            // 5. Ensure the logo is displayed again
+            const logo = document.getElementById('site-logo');
+            if(logo) logo.style.display = 'block';
+
+            setMode('intro'); // Return to initial interface
+        }
+
+        // IMPROVE SHOWCRASH
+        function showCrash() {
+             // Stop old loop if exists
+            if (crashLoopID) clearInterval(crashLoopID);
+
+            // 【修改点在这里】播放背景音
+            if (bgDrone) {
+                bgDrone.volume = 0.4; // <--- 必须加这一句！把音量恢复回来
+                bgDrone.currentTime = 0;
+                // 使用 catch 防止浏览器报错
+                bgDrone.play().catch(e => console.warn('Drone blocked', e));
+            }
+
+            // UI Setup
+            setMode('crash');
+
+            // Initial Burst
+            for(let i=0; i<5; i++) spawnWindow();
+
+            // Assign new interval
+            crashLoopID = setInterval(() => {
+                spawnWindow();
+            }, 800);
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            // Hide all
+            introScreen.classList.remove('active');
+            verifiedScreen.classList.remove('active');
+            crashRestartBtn.style.display = 'none';
+            quoteBox.style.display = 'none';
+            crashBg.style.display = 'none';
+
+            // Logo visibility control
+            const logo = document.getElementById('site-logo');
+            if (logo) {
+                if (mode === 'crash') {
+                    logo.style.display = 'none';
+                } else {
+                    logo.style.display = 'block';
+                }
+            }
+            
+            if (mode === 'intro') {
+                introScreen.classList.add('active');
+                codeInput.focus();
+            } else if (mode === 'verified') {
+                verifiedScreen.classList.add('active');
+                // Success Audio Logic
+                bgDrone.pause();
+                bgDrone.currentTime = 0;
+                successSound.play().catch(e => console.warn('Success sound blocked/missing'));
+            } else if (mode === 'crash') {
+                crashRestartBtn.style.display = 'block';
+                quoteBox.style.display = 'block';
+                
+                // Set BG Image
+                const visualData = VISUAL_MAP[crashVisual];
+                if (visualData) {
+                    crashBg.style.backgroundImage = `url('${visualData.img}')`;
+                    crashBg.style.display = 'block';
+                }
+            }
+        }
+
+        function checkCode() {
+            // Audio unlock
+            bgDrone.play().then(() => {
+                if(currentMode === 'intro') { 
+                    bgDrone.pause(); 
+                    bgDrone.currentTime = 0; 
+                }
+            }).catch(e => console.log('Audio autoplay interaction handled'));
+
+            const code = codeInput.value.trim().toUpperCase();
+            
+            if (!code) {
+                errorMsg.textContent = 'ERROR: INPUT REQUIRED';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            // 1. Success Logic
+            if (SUCCESS_CODES.includes(code)) {
+                if (crashLoopID) clearInterval(crashLoopID); // Safety
+                setMode('verified');
+                return;
+            }
+
+            // 2. Crash Logic (Two-way mapping)
+            const crashRegex = /^A[1-6]B[1-4]$/;
+            if (crashRegex.test(code)) {
+                // Ensure state is set before mode change
+                crashTask = code.substring(0, 2); // e.g., A1
+                crashVisual = code.substring(2);   // e.g., B1
+                
+                showCrash(); // Use improved function
+                return;
+            }
+
+            // 3. Invalid
+            errorMsg.textContent = 'ERROR: INVALID CODE';
+            errorMsg.style.display = 'block';
+            playSoundSafe(randomItem(genericErrors)); // Optional feedback
+        }
+
+        // --- WINDOW GENERATION ---
+
+        function generateRandomCodeLines(lines = 20) {
+            const snippets = [
+                "0x4F3A void main() {", "system.failure(0x00);", "if (human) break;", 
+                "// MEMORY LEAK DETECTED", "while(true) { spawn(); }", "<buffer_overflow>", 
+                "segmentation fault (core dumped)", "ERROR: CAPTCHA_FAILED", "analyzing texture..."
+            ];
+            let code = "";
+            for(let i=0; i<lines; i++) code += randomItem(snippets) + "\n";
+            return code;
+        }
+
+        // createDraggablePopup logic
+        function spawnWindow(x, y) {
+            if (windows.length >= MAX_WINDOWS) return;
+            
+            const visualData = VISUAL_MAP[crashVisual];
+            if (!visualData) return; // Safety check
+
+            // Strict Emoji List & Sound
+            const emojiList = visualData.emojis;
+            const bgImg = visualData.img;
+
+            // --- AUDIO LOGIC ACTIONS ---
+            // Action A: Play random generic error (100% prob)
+            playSoundSafe(randomItem(genericErrors));
+
+            // Action B: Play specific sound (30% prob)
+            if (Math.random() < 0.3 && visualData.sound) {
+                playSoundSafe(visualData.sound);
+            }
+            // ---------------------------
+
+            const taskText = TASK_MAP[crashTask] || "SYSTEM FAILURE";
+
+            zCounter++;
+            const type = randomItem(['IMAGE', 'TEXT', 'CODE', 'CAPTCHA']);
+            const width = type === 'CAPTCHA' ? 300 : randomInt(200, 400);
+            const height = type === 'CAPTCHA' ? 320 : randomInt(150, 300);
+            const posX = x !== undefined ? x : randomInt(0, window.innerWidth - width);
+            const posY = y !== undefined ? y : randomInt(0, window.innerHeight - height);
+            const rotation = randomInt(-5, 5);
+            const id = generateId();
+
+            const winEl = document.createElement('div');
+            winEl.className = 'mac-window';
+            winEl.id = id;
+            winEl.style.width = width + 'px';
+            winEl.style.height = height + 'px';
+            winEl.style.left = posX + 'px';
+            winEl.style.top = posY + 'px';
+            winEl.style.zIndex = zCounter;
+            winEl.style.transform = `rotate(${rotation}deg)`;
+
+            let title = "System Alert";
+            let contentHtml = "";
+
+            if (type === 'TEXT') {
+                title = `Task: ${crashTask}`;
+                contentHtml = `<div class="content-text">${taskText}</div>`;
+            } else if (type === 'CODE') {
+                title = "Terminal.exe";
+                contentHtml = `<pre class="content-code">${generateRandomCodeLines()}</pre>`;
+            } else if (type === 'IMAGE') {
+                title = visualData.img;
+                const bgStyle = bgImg ? `background-image: url('${bgImg}');` : '';
+                const content = bgImg ? '' : randomItem(emojiList);
+                contentHtml = `<div class="content-image-wrapper" style="${bgStyle}">${content}</div>`;
+            } else if (type === 'CAPTCHA') {
+                title = taskText.substring(0, 25) + "...";
+                const bgStyle = bgImg ? `background-image: url('${bgImg}'); background-size: cover; background-position: center;` : '';
+                let cellsHtml = '';
+                for(let i=0; i<9; i++) {
+                    cellsHtml += `<div class="captcha-cell" onclick="this.classList.toggle('selected'); event.stopPropagation();">${randomItem(emojiList)}</div>`;
+                }
+                contentHtml = `<div class="content-captcha" style="${bgStyle}">${cellsHtml}</div>`;
+            }
+
+            winEl.innerHTML = `
+                <div class="mac-titlebar">
+                    <div class="mac-buttons">
+                        <div class="mac-btn close" onclick="closeWindow('${id}')"></div>
+                        <div class="mac-btn min"></div>
+                        <div class="mac-btn max"></div>
+                    </div>
+                    <div class="mac-title">${title}</div>
+                </div>
+                <div class="mac-content">${contentHtml}</div>
+            `;
+
+            winEl.onmousedown = (e) => {
+                focusWindow(winEl);
+                startDrag(e, winEl);
+            };
+
+            windowsContainer.appendChild(winEl);
+            windows.push(id);
+        }
+
+        // --- WINDOW INTERACTION ---
+
+        function focusWindow(el) {
+            zCounter++;
+            el.style.zIndex = zCounter;
+        }
+
+        window.closeWindow = function(id) {
+            const el = document.getElementById(id);
+            if(!el) return;
+            
+            const rect = el.getBoundingClientRect();
+            el.remove();
+            windows = windows.filter(wId => wId !== id);
+
+            if (windows.length < MAX_WINDOWS) {
+                spawnWindow(rect.left - 20, rect.top - 20);
+                spawnWindow(rect.left + 20, rect.top + 20);
+            }
+        };
+
+        function startDrag(e, el) {
+            if (!e.target.closest('.mac-titlebar')) return;
+            e.preventDefault();
+
+            let shiftX = e.clientX - el.getBoundingClientRect().left;
+            let shiftY = e.clientY - el.getBoundingClientRect().top;
+
+            function moveAt(pageX, pageY) {
+                el.style.left = pageX - shiftX + 'px';
+                el.style.top = pageY - shiftY + 'px';
+            }
+
+            function onMouseMove(event) {
+                moveAt(event.pageX, event.pageY);
+            }
+
+            document.addEventListener('mousemove', onMouseMove);
+
+            document.onmouseup = function() {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.onmouseup = null;
+            };
+        }
+
+        // --- EVENT LISTENERS ---
+        verifyBtn.addEventListener('click', checkCode);
+        codeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') checkCode();
+        });
+        
+        crashRestartBtn.addEventListener('click', resetSystem);
+        backBtn.addEventListener('click', resetSystem);
+
+        // Init
+        setMode('intro');
+
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

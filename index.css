@@ -1,0 +1,444 @@
+/* index.css - CAPTCHAWAR Style System */
+
+:root {
+    --color-red: #ff0000;
+    --color-blue: #5c98ff;
+    --color-green: #86e105;
+    --color-white: #ffffff;
+    --color-bg: #f0f0f0;
+    --font-main: 'Gugi', cursive;
+    --font-mono: 'VT323', monospace;
+}
+
+body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    position: fixed; /* 锁定背景，防止手机浏览器下拉回弹 */
+    background-color: var(--color-white);
+    font-family: var(--font-main);
+    user-select: none;
+    -webkit-font-smoothing: none;
+    touch-action: manipulation;
+}
+
+#root {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* === Ambient Layers === */
+
+.scanlines {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0),
+        rgba(0, 0, 0, 0) 1px,
+        rgba(0, 0, 0, 0.1) 1px,
+        rgba(0, 0, 0, 0.1) 2px
+    );
+    pointer-events: none;
+    z-index: 9999;
+}
+
+.ascii-bg {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    z-index: 0;
+    opacity: 0.15;
+    pointer-events: none;
+    overflow: hidden;
+    font-family: var(--font-mono);
+    font-size: 14px;
+    line-height: 14px;
+    color: #000;
+    white-space: pre;
+}
+
+/* === Surveillance Overlay === */
+
+.surveillance-ui {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    pointer-events: none;
+    z-index: 9000;
+    font-family: var(--font-mono);
+    color: var(--color-red);
+    text-shadow: 0 0 2px var(--color-red);
+}
+
+.coords {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    font-size: 1.5rem;
+}
+
+.probability {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    font-size: 1.5rem;
+    text-align: right;
+}
+
+.crosshair {
+    position: absolute;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 0, 0, 0.2);
+    top: 50%;
+}
+.crosshair.v {
+    width: 1px;
+    height: 100%;
+    background: rgba(255, 0, 0, 0.2);
+    left: 50%;
+    top: 0;
+}
+
+/* === Terminal (Intro) === */
+
+.terminal-container {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;          /* 手机上占据 90% 宽度 */
+    max-width: 400px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 1.5rem;
+    box-sizing: border-box;
+    border: 2px solid var(--color-green);
+    box-shadow: 0 0 20px var(--color-green);
+    font-family: var(--font-mono);
+    color: var(--color-green);
+}
+
+.terminal-header {
+    margin-bottom: 20px;
+    text-transform: uppercase;
+    border-bottom: 1px dashed var(--color-green);
+    padding-bottom: 10px;
+}
+
+.terminal-input-group {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+.terminal-prompt {
+    color: var(--color-green);
+    font-size: 1.2rem;
+}
+
+.terminal-input {
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid var(--color-green);
+    color: var(--color-white);
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    width: 100%;
+    outline: none;
+    text-transform: uppercase;
+}
+
+.terminal-error {
+    color: var(--color-red);
+    margin-top: 10px;
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    animation: blink 0.5s step-end infinite alternate;
+}
+
+.cursor {
+    display: inline-block;
+    width: 10px;
+    height: 1.2em;
+    background: var(--color-green);
+    animation: blink 1s step-end infinite;
+}
+
+.terminal-btn {
+    margin-top: 25px;
+    background: transparent;
+    border: 2px solid var(--color-green);
+    color: var(--color-green);
+    padding: 10px 20px;
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: bold;
+    width: 100%;
+    transition: all 0.1s;
+}
+
+.terminal-btn:hover {
+    background: var(--color-green);
+    color: #000;
+    box-shadow: 0 0 15px var(--color-green);
+}
+
+.terminal-btn:active {
+    transform: scale(0.98);
+}
+
+.verified-text-box {
+    margin: 20px 0;
+    text-align: center;
+    color: var(--color-green);
+    font-family: var(--font-mono);
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* === Mac Windows === */
+
+.mac-window {
+    position: absolute;
+    background: #ececec;
+    border: 1px solid #aaa;
+    border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    user-select: none;
+
+    /* transition: transform 0.1s; Removed for smoother dragging */
+    min-width: 250px;    /* 保证最小可读性 */
+    max-width: 95vw;     /* 不超过屏幕宽度 */
+}
+
+.mac-titlebar {
+    height: 24px;
+    background: linear-gradient(to bottom, #e0e0e0, #c0c0c0);
+    border-bottom: 1px solid #aaa;
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
+    touch-action: none; /* 禁用手机浏览器默认的滚动/缩放，把控制权交给 JS */
+    cursor: grab;
+}
+
+.mac-titlebar:active {
+    cursor: grabbing;
+}
+
+.mac-buttons {
+    display: flex;
+    gap: 6px;
+    margin-right: 12px;
+}
+
+.mac-btn {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 1px solid rgba(0,0,0,0.2);
+}
+
+.mac-btn.close { background: #ff5f56; cursor: pointer; }
+.mac-btn.min { background: #ffbd2e; }
+.mac-btn.max { background: #27c93f; }
+
+.mac-btn.close:hover { background: #ff3b30; }
+
+.mac-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    color: #333;
+    flex: 1;
+    text-align: center;
+    margin-right: 50px; /* balance buttons */
+}
+
+.mac-content {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    background: #fff;
+}
+
+/* Content Types */
+.content-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+}
+
+.content-text {
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: red;
+    background: #000;
+    /* text-transform: uppercase; */ /* allow lowercase for questions */
+}
+
+.content-code {
+    background: #111;
+    color: var(--color-green);
+    padding: 10px;
+    font-size: 0.8rem;
+    font-family: var(--font-mono);
+    overflow: hidden;
+}
+
+.content-captcha {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2px;
+    background: #fff;
+    padding: 2px;
+}
+
+.captcha-cell {
+    background: rgba(221, 221, 221, 0.7); /* Transparent to show bg image */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    position: relative;
+    cursor: pointer;
+    overflow: hidden;
+}
+.captcha-cell.selected::after {
+    content: '✓';
+    position: absolute;
+    color: var(--color-green);
+    font-size: 3rem;
+    text-shadow: 0 0 5px black;
+}
+
+/* Educational Quote */
+.edu-quote {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    background: black;
+    color: white;
+    padding: 10px;
+    text-align: center;
+    font-family: var(--font-mono);
+    z-index: 10000;
+    font-size: 1.2rem;
+    border-top: 1px solid var(--color-red);
+}
+
+/* === Crash Restart Button === */
+.crash-restart-btn {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10001; /* Above everything */
+    background: #000;
+    border: 2px solid var(--color-red);
+    color: var(--color-red);
+    font-family: var(--font-mono);
+    font-size: 1.2rem;
+    padding: 10px 15px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 0 10px var(--color-red);
+    transition: all 0.2s;
+}
+
+.crash-restart-btn:hover {
+    background: var(--color-red);
+    color: #000;
+    box-shadow: 0 0 20px var(--color-red);
+}
+/* === 移动端适配 (手机和平板) === */
+@media (max-width: 768px) {
+    /* 全局强制：任何元素都不允许超出其容器宽度 */
+    * {
+        box-sizing: border-box !important;
+    }
+    
+    /* 1. 强制锁定背景防止橡皮筋回弹，但不禁用点击 */
+    body, html {
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+        height: 100% !important;
+        /* 允许点击和缩放，但不允许系统手势翻页 */
+        touch-action: none !important; 
+    }
+
+    /* 2. 标志性 Logo 适配 */
+    #site-logo {
+        position: fixed !important;
+        top: 5% !important; /* 距离顶部预留一点空间 */
+        width: 85vw !important; /* 宽度随屏幕缩放 */
+        max-width: 320px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 1000;
+    }
+
+    /* 3. 终端容器 (初始 + 验证成功) 的强力居中 */
+   .terminal-container {
+        width: 90vw !important; /* 强制容器宽度为屏幕宽度的 90% */
+        min-width: 0 !important;
+        max-width: 380px !important;
+        padding: 15px !important; /* 减小内边距，给内容留空间 */
+        left: 50% !important;
+        top: 55% !important; /* 稍微靠下一点，避开 LOGO */
+        transform: translate(-50%, -50%) !important;
+        position: fixed !important;
+        border-width: 1px !important;
+    }
+
+    /* 4. 验证成功文本适配 */
+    .verified-text-box {
+        margin: 10px 0 !important;
+        padding: 10px !important;
+    }
+    
+    /* 修正验证成功界面的内部文本 */
+    .verified-text-box div {
+        font-size: 0.95rem !important; /* 缩小字号防止换行溢出 */
+        line-height: 1.4 !important;
+        word-break: break-all !important; /* 强制换行 */
+    }
+
+    /* 5. 弹窗 (Mac Windows) 适配 */
+    .mac-window {
+        width: 280px !important;
+        height: auto !important;
+        max-width: 85vw !important;
+        touch-action: none !important; /* 弹窗主体禁止系统手势 */
+    }
+
+    .mac-titlebar {
+        height: 35px !important; /* 手机上手指粗，调高标题栏方便抓取 */
+        touch-action: none !important; /* 必须：禁止浏览器拦截拖拽手势 */
+    }
+
+    /* 6. 监控 UI 调整 */
+    .surveillance-ui .coords, 
+    .surveillance-ui .probability {
+        font-size: 0.8rem !important;
+        bottom: 15px !important;
+        right: 15px !important;
+    }
+    .terminal-btn {
+        width: 100% !important; /* 按钮横跨容器 */
+        font-size: 1.1rem !important;
+        padding: 10px !important;
+    }
+}
